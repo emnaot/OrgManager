@@ -8,9 +8,151 @@
 import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { requireAuth, getAuthUser } from "@/lib/utils/auth";
-import { isMember } from "@/lib/utils/permissions";
+import { isMember, canInviteMembers } from "@/lib/utils/permissions";
 import { OrganizationInvitation } from "@/lib/types/organization";
-import { InvitationStatus } from "@/lib/types/auth";
+import { InvitationStatus, OrganizationRole } from "@/lib/types/auth";
+import crypto from "crypto";
+import { z } from "zod";
+import { sendInvitationEmail } from "@/lib/utils/email";
+
+// Schema for invite member input validation
+const InviteMemberSchema = z.object({
+  organizationId: z.string().uuid(),
+  email: z.string().email(),
+  role: z.enum(["admin", "user", "viewer"]),
+});
+
+/**
+ * Invite a member to an organization
+ * Creates invitation record and sends email
+ */
+export async function inviteMember(
+  organizationId: string,
+  email: string,
+  role: OrganizationRole
+): Promise<{ error: string | null; invitationId?: string }> {
+  try {
+    // Validate input
+    const validated = InviteMemberSchema.safeParse({
+      organizationId,
+      email,
+      role,
+    });
+    if (!validated.success) {
+      return { error: "Invalid input: " + validated.error.issues[0].message };
+    }
+
+    const user = await requireAuth();
+
+    // Check permission to invite
+    const canInvite = await canInviteMembers(user.id, organizationId);
+    if (!canInvite) {
+      return { error: "You don't have permission to invite members" };
+    }
+
+    const supabase = await createServerSupabaseClient();
+
+    // Check if there's already a pending invitation for this email and organization
+    const { data: existingInvitation } = await supabase
+      .from("invitations")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("invitee_email", email)
+      .eq("status", "pending")
+      .single();
+
+    if (existingInvitation) {
+      return { error: "An invitation has already been sent to this email" };
+    }
+
+    // Check if the invitee is already a member (if user exists)
+    const { data: inviteeUser } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", email)
+      .single();
+
+    if (inviteeUser) {
+      const { data: existingMember } = await supabase
+        .from("organization_members")
+        .select("id")
+        .eq("organization_id", organizationId)
+        .eq("user_id", inviteeUser.id)
+        .single();
+
+      if (existingMember) {
+        return { error: "This user is already a member of the organization" };
+      }
+    }
+
+    // Get organization name for email
+    const { data: organization, error: orgError } = await supabase
+      .from("organizations")
+      .select("name")
+      .eq("id", organizationId)
+      .single();
+
+    if (orgError || !organization) {
+      return { error: "Organization not found" };
+    }
+
+    // Generate unique token
+    const token = crypto.randomUUID();
+
+    // Set expiration (7 days)
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    // Create invitation record
+    const { data: invitation, error: insertError } = await supabase
+      .from("invitations")
+      .insert({
+        organization_id: organizationId,
+        inviter_id: user.id,
+        invitee_email: email,
+        role,
+        status: "pending",
+        token,
+        expires_at: expiresAt.toISOString(),
+      })
+      .select()
+      .single();
+
+    if (insertError || !invitation) {
+      console.error("Error creating invitation:", insertError);
+      return { error: "Failed to create invitation. Please try again." };
+    }
+
+    // Construct invitation URL using environment variable
+    // This ensures it works in both local[](http://localhost:3000) and Vercel (deployed URL)
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    const invitationUrl = `${baseUrl}/invitations/accept?token=${token}`;
+
+    // Send email
+    const { success, error: emailError } = await sendInvitationEmail({
+      to: email,
+      organizationName: organization.name,
+      invitationUrl,
+      role,
+      inviterEmail: user.email,
+    });
+
+    if (!success) {
+      // Optionally, delete the invitation if email fails
+      await supabase.from("invitations").delete().eq("id", invitation.id);
+      return { error: emailError || "Failed to send invitation email" };
+    }
+
+    // Revalidate relevant paths
+    revalidatePath(`/organizations/${organizationId}/members`);
+    revalidatePath(`/organizations/${organizationId}`);
+
+    return { error: null, invitationId: invitation.id };
+  } catch (error) {
+    console.error("Invite member error:", error);
+    return { error: "An unexpected error occurred. Please try again later." };
+  }
+}
 
 /**
  * Get pending invitations for the current user
@@ -568,4 +710,3 @@ export async function cancelInvitation(
     };
   }
 }
-
