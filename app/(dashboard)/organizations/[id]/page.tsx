@@ -81,7 +81,7 @@ export default async function OrganizationDetailPage({ params }: OrganizationPag
           <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary-500/10 rounded-full blur-3xl animate-float"></div>
           <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary-500/10 rounded-full blur-3xl animate-float delay-300"></div>
         </div>
-        
+
         <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
           <Link
             href="/organizations"
@@ -105,7 +105,8 @@ export default async function OrganizationDetailPage({ params }: OrganizationPag
                   <h1 className="text-4xl lg:text-5xl font-bold gradient-text animate-gradient mb-2">
                     {organization.name}
                   </h1>
-                  <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full ${getRoleBadgeClass(userRole)} animate-slideIn`}>
+                  <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full ${getRoleBadgeClass(userRole ?? 'guest')} animate-slideIn`}>
+
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
                     </svg>
@@ -113,13 +114,13 @@ export default async function OrganizationDetailPage({ params }: OrganizationPag
                   </div>
                 </div>
               </div>
-              
+
               {organization.description && (
                 <p className="text-lg text-light-2 max-w-3xl leading-relaxed animate-fadeIn delay-200">
                   {organization.description}
                 </p>
               )}
-              
+
               <div className="flex flex-wrap items-center gap-6 mt-6 text-sm text-light-3 animate-fadeIn delay-300">
                 <div className="flex items-center gap-2">
                   <svg className="w-5 h-5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -148,7 +149,7 @@ export default async function OrganizationDetailPage({ params }: OrganizationPag
               {userRole === "owner" && (
                 <Link href={`/organizations/${id}/settings`}>
                   <Button variant="outline" className="group border-2 hover:border-primary-500 hover:bg-primary-500/10 transition-all duration-300">
-              
+
                     Settings
                   </Button>
                 </Link>
@@ -172,7 +173,7 @@ export default async function OrganizationDetailPage({ params }: OrganizationPag
                 </div>
                 <h2 className="text-2xl font-bold text-light-1">Details</h2>
               </div>
-              
+
               <div className="space-y-6">
                 <div className="group/item">
                   <dt className="text-sm font-semibold text-light-3 uppercase tracking-wider mb-2 flex items-center gap-2">
@@ -181,22 +182,22 @@ export default async function OrganizationDetailPage({ params }: OrganizationPag
                   </dt>
                   <dd className="text-base font-medium text-light-1 pl-3">{organization.name}</dd>
                 </div>
-                
+
                 <div className="group/item">
                   <dt className="text-sm font-semibold text-light-3 uppercase tracking-wider mb-2 flex items-center gap-2">
                     <div className="w-1 h-4 bg-secondary-500 rounded-full group-hover/item:h-6 transition-all duration-300"></div>
                     Created On
                   </dt>
                   <dd className="text-base font-medium text-light-1 pl-3">
-                    {new Date(organization.created_at).toLocaleDateString('en-US', { 
+                    {new Date(organization.created_at).toLocaleDateString('en-US', {
                       weekday: 'long',
-                      year: 'numeric', 
-                      month: 'long', 
-                      day: 'numeric' 
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
                     })}
                   </dd>
                 </div>
-                
+
                 {organization.description && (
                   <div className="group/item">
                     <dt className="text-sm font-semibold text-light-3 uppercase tracking-wider mb-2 flex items-center gap-2">
@@ -226,7 +227,7 @@ export default async function OrganizationDetailPage({ params }: OrganizationPag
                       <p className="text-sm text-light-3 mt-1">{members.length} total members</p>
                     </div>
                   </div>
-                  
+
                   {canManage && (
                     <Link href={`/organizations/${id}/members`}>
                       <Button variant="primary" size="sm" className="shadow-lg shadow-primary-500/30 hover:shadow-xl hover:shadow-primary-500/50 transition-all duration-300">
@@ -262,7 +263,7 @@ export default async function OrganizationDetailPage({ params }: OrganizationPag
                               {member.user?.email?.charAt(0).toUpperCase() || "?"}
                             </span>
                           </div>
-                          
+
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-2 mb-2">
                               <p className="font-semibold text-light-1 truncate group-hover:text-primary-500 transition-colors duration-300">
@@ -272,7 +273,7 @@ export default async function OrganizationDetailPage({ params }: OrganizationPag
                                 {member.role}
                               </span>
                             </div>
-                            
+
                             <div className="flex items-center gap-2 text-xs text-light-3">
                               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
